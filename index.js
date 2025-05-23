@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { verifyFirebaseToken } = require('./firebase');
-const { createStreamingChatCompletion } = require('./services/openai');
+const { createStreamingChatCompletion, handleNearbyRequest } = require('./services/openai');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -14,9 +14,9 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
 });
 
-app.post('/respond',verifyFirebaseToken, async (req, res) => {
+app.post('/respond', verifyFirebaseToken, async (req, res) => {
     try {
-        const { message, selectedModel, threadMessages, parameters } = req.body;
+        const { message, selectedModel, threadMessages, parameters, latitude, longitude } = req.body;
 
         const messages = Array.isArray(threadMessages) ? threadMessages : [];
 
@@ -34,6 +34,10 @@ app.post('/respond',verifyFirebaseToken, async (req, res) => {
         const allMessages = messageExists
             ? messages
             : [...messages, currentMessage];
+
+        if (latitude !== undefined && longitude !== undefined) {
+            return await handleNearbyRequest(latitude, longitude, res,allMessages,parameters);
+        }
 
         await createStreamingChatCompletion(allMessages, {
             ...parameters,
